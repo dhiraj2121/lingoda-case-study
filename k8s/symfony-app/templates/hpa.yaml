@@ -1,0 +1,51 @@
+# This HPA for symfony application and will be scaled base on the POD cpu and memory utilization.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $.Values.symfony.name }}-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $.Values.symfony.name }}
+  minReplicas: {{ $.Values.symfony.hpa.minReplicas }}
+  maxReplicas: {{ $.Values.symfony.hpa.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 90
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: AverageValue
+        averageValue: 200Mi
+---
+# This HPA for mysql database and will be scaled base on the POD cpu and memory utilization.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $.Values.mysql.name }}-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet                                   # selector would be StatefulSet
+    name: {{ $.Values.mysql.name }}
+  minReplicas: {{ $.Values.mysql.hpa.minReplicas }}
+  maxReplicas: {{ $.Values.mysql.hpa.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 90
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: AverageValue
+        averageValue: 600Mi

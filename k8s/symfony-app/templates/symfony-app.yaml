@@ -1,0 +1,156 @@
+# Deployment template of symfony app
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Values.symfony.name }}
+  labels:
+    app: {{ $.Values.symfony.name }}
+spec:
+  replicas: {{ $.Values.symfony.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $.Values.symfony.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Values.symfony.name }}
+    spec:
+      restartPolicy: Always
+      initContainers:                               # Init Container to do database migration first
+        - name: migration
+          image: {{ $.Values.symfony.image.name }}:{{ $.Values.symfony.image.tag }}
+          imagePullPolicy: {{ $.Values.symfony.imagePullPolicy }}
+          resources:
+            requests:
+              memory: {{ $.Values.symfony.resources.initContainers.requests.memory }}
+              cpu: {{ $.Values.symfony.resources.initContainers.requests.cpu }}
+            limits:
+              memory: {{ $.Values.symfony.resources.initContainers.limits.memory }}
+              cpu: {{ $.Values.symfony.resources.initContainers.limits.cpu }}
+          env:
+            - name: MYSQL_HOST
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_HOST
+                  name: database-creds
+            - name: MYSQL_PORT
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_PORT
+                  name: database-creds
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_ROOT_PASSWORD
+                  name: database-creds
+            - name: MYSQL_DATABASE
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_DATABASE
+                  name: database-creds
+            - name: MYSQL_USER
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_USER
+                  name: database-creds
+            - name: MYSQL_PASSWORD
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_PASSWORD
+                  name: database-creds
+          command: [ "bash", "-c", "./migration.sh" ]
+      containers:
+        - name: {{ $.Values.symfony.name }}                   # Symfony application container
+          image: {{ $.Values.symfony.image.name }}:{{ $.Values.symfony.image.tag }}
+          imagePullPolicy: {{ $.Values.symfony.imagePullPolicy }}
+          command: ["bash", "-c", "composer install --ignore-platform-reqs; php-fpm"]  
+          resources:
+            requests:
+              memory: {{ $.Values.symfony.resources.symfony.requests.memory }}
+              cpu: {{ $.Values.symfony.resources.symfony.requests.cpu }}
+            limits:
+              memory: {{ $.Values.symfony.resources.symfony.limits.memory }}
+              cpu: {{ $.Values.symfony.resources.symfony.limits.cpu }}
+          env:
+            - name: MYSQL_HOST
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_HOST
+                  name: database-creds
+            - name: MYSQL_PORT
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_PORT
+                  name: database-creds
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_ROOT_PASSWORD
+                  name: database-creds
+            - name: MYSQL_DATABASE
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_DATABASE
+                  name: database-creds
+            - name: MYSQL_USER
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_USER
+                  name: database-creds
+            - name: MYSQL_PASSWORD
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_PASSWORD
+                  name: database-creds
+          ports:
+            - containerPort: {{ $.Values.symfony.ports.containerPort }}
+              name: {{ $.Values.symfony.ports.name }}
+              protocol: {{ $.Values.symfony.ports.protocol }}
+          readinessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 10
+        - image: {{ $.Values.symfony.nginx.image.name }}:{{ $.Values.symfony.nginx.image.tag }}
+          name: {{ $.Values.symfony.nginx.name }}
+          imagePullPolicy: {{ $.Values.symfony.nginx.imagePullPolicy }}
+          resources:
+            requests:
+              memory: {{ $.Values.symfony.nginx.resources.requests.memory }}
+              cpu: {{ $.Values.symfony.nginx.resources.requests.cpu }}
+            limits:
+              memory: {{ $.Values.symfony.resources.initContainers.limits.memory }}
+              cpu: {{ $.Values.symfony.nginx.resources.limits.cpu }}
+          ports:
+            - containerPort: {{ $.Values.symfony.nginx.ports.containerPort }}
+              name: {{ $.Values.symfony.nginx.ports.name }}
+              protocol: {{ $.Values.symfony.nginx.ports.protocol }}
+          readinessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+# service to expose the symfony app in the cluster.
+# In production scenario we usually expose the application service to the internet using ingress and ingress loadbalancer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.symfony.service.name }}
+spec:
+  selector:
+    app: {{ $.Values.symfony.name }}
+  ports:
+    - protocol: {{ $.Values.symfony.service.protocol }}
+      port: {{ $.Values.symfony.service.port }}
+      targetPort: {{ $.Values.symfony.service.targetPort }}

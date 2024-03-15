@@ -1,0 +1,39 @@
+# Taskfile tasks/commands will do following tasks:
+# 1. create a kubernetes cluster using Kind
+# 2. Create Docker images
+# 3. Load Docker images into Kind cluster
+# 4. Deploy metrics server and Symfony app using helm charts
+
+version: '3'
+
+env:
+  CLUSTER_NAME: symfony-cluster
+  PHP_DOCKER_IMAGE: symfony-app:latest
+  NGINX_DOCKER_IMAGE: nginx-app:latest
+
+tasks:
+  create-cluster:
+    cmds:
+      - kind create cluster --name ${CLUSTER_NAME} --config kind/multi-node.yaml
+    status:
+      - kind get clusters | grep -q "^${CLUSTER_NAME}$"
+  switch-context:
+    cmds:
+      - kubectl config use-context kind-${CLUSTER_NAME}
+  php-docker-image:
+   cmds:
+    - docker build -t ${PHP_DOCKER_IMAGE} .
+  nginx-docker-image:
+   cmds:
+    - docker build -t ${NGINX_DOCKER_IMAGE} -f .docker/nginx/Dockerfile .
+  load-dockerimage:
+   cmds:
+    - kind load docker-image ${PHP_DOCKER_IMAGE} --name ${CLUSTER_NAME}
+    - kind load docker-image ${NGINX_DOCKER_IMAGE} --name ${CLUSTER_NAME}
+  deploy-metric-server:
+   cmds:
+    - kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+    - helm upgrade --atomic --cleanup-on-fail --install --namespace monitoring metrics-server k8s/metrics-server
+  deploy-symfony-app:
+   cmds:
+    - helm upgrade --atomic --cleanup-on-fail --install symfony-app k8s/symfony-app

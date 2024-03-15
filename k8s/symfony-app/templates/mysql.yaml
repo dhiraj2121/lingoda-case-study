@@ -1,0 +1,102 @@
+# Template for mysql StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  replicas: {{ $.Values.mysql.replicas }}
+  serviceName: {{ $.Values.mysql.name }}
+  selector:
+    matchLabels:
+      app:  {{ $.Values.mysql.name }}
+  template:
+    metadata:
+      labels:
+        app:  {{ $.Values.mysql.name }}
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name:  {{ $.Values.mysql.name }}
+          image: {{ $.Values.mysql.image.name }}:{{ $.Values.mysql.image.tag }}
+          resources:
+            requests:
+              memory: {{ $.Values.mysql.resources.requests.memory }}
+              cpu: {{ $.Values.mysql.resources.requests.cpu }}
+            limits:
+              memory: {{ $.Values.mysql.resources.limits.memory }}
+              cpu: {{ $.Values.mysql.resources.limits.cpu }}
+          ports:
+            - name: tpc
+              protocol: {{ $.Values.mysql.ports.protocol }}
+              containerPort: {{ $.Values.mysql.ports.containerPort }}
+          livenessProbe:                                # Liveness probe to check if mysql pod is up 
+            exec:
+              command:
+                - bash
+                - "-c"
+                - |
+                  mysqladmin -uroot -p$MYSQL_ROOT_PASSWORD ping &> /dev/null
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:                               # Readiness probe to check if mysql pod is ready to accept traffic
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - set -ex
+                - >-
+                  mysql -h127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD -e'SELECT 1'
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            timeoutSeconds: 1
+          env:                                      # environment variables required for mysql database
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_ROOT_PASSWORD
+                  name: database-creds
+            - name: MYSQL_DATABASE
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_DATABASE
+                  name: database-creds
+            - name: MYSQL_USER
+              valueFrom: 
+                secretKeyRef: 
+                  key:  MYSQL_USER
+                  name: database-creds
+            - name: MYSQL_PASSWORD
+              valueFrom: 
+                secretKeyRef: 
+                  key: MYSQL_PASSWORD
+                  name: database-creds
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: standard
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+---
+# Service to access the mysql database within cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.mysql.service.name }}
+  labels:
+    app: {{ $.Values.mysql.service.name }}
+spec:
+  clusterIP: None                            # created Headless service for mysql Database
+  selector:
+    app: {{ $.Values.mysql.name }}
+  ports:
+    - name: tcp
+      protocol: {{ $.Values.mysql.service.ports.protocol }}
+      port: {{ $.Values.mysql.service.ports.port }}

@@ -1,0 +1,78 @@
+
+# Helm default values for mysql and symfony application
+mysql:
+  replicas: 1
+  name: mysql
+  image:
+    name: mysql
+    tag: 8.0.33
+  ports:
+    protocol: TCP
+    containerPort: 3306
+  service:
+    name: mysql
+    ports:
+      protocol: TCP
+      port: 3306
+  hpa:
+    minReplicas: 1
+    maxReplicas: 11
+  resources:
+    requests:
+      memory: "500Mi"
+      cpu: "8"
+    limits:
+      memory: "1000Mi"
+      cpu: "12"
+
+symfony:
+  replicas: 1
+  name: symfony-app
+  imagePullPolicy: Never
+  image:
+    name: symfony-app
+    tag: latest
+  ports:
+    containerPort: 9000
+    name: http
+    protocol: TCP
+  service:
+    name: symfony-app
+    protocol: TCP
+    port: 80
+    targetPort: 80
+  nginx:
+    name: nginx
+    image:
+      name: nginx-app
+      tag: latest
+    imagePullPolicy: Never
+    ports:
+      containerPort: 80
+      name: http
+      protocol: TCP
+    resources:
+      requests:
+        cpu: 70m
+        memory: 100Mi
+      limits:
+        cpu: 150m
+        memory: 200Mi
+  hpa:
+    minReplicas: 1
+    maxReplicas: 11
+  resources:
+    initContainers:
+      requests:
+        cpu: 70m
+        memory: 100Mi
+      limits:
+        cpu: 150m
+        memory: 200Mi
+    symfony:
+      requests:
+        cpu: 70m
+        memory: 100Mi
+      limits:
+        cpu: 150m
+        memory: 200Mi
